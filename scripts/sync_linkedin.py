@@ -188,14 +188,37 @@ def write_json(name, data):
     print(f"Wrote {len(data) if isinstance(data, list) else 'profile'} → {name}")
 
 
+def diagnose(api):
+    """Make a raw call to the Voyager API and print what LinkedIn returns.
+
+    Helps debug auth failures since the library swallows error responses.
+    """
+    print("Diagnostic: calling /voyager/api/me ...")
+    res = api.client.session.get(
+        "https://www.linkedin.com/voyager/api/me",
+        cookies=api.client.session.cookies,
+        headers=api.client.session.headers,
+    )
+    print(f"  HTTP {res.status_code} — {len(res.content)} bytes")
+    body = res.text[:500]
+    print(f"  Body snippet: {body!r}")
+    print(f"  Cookies sent: {[c.name for c in api.client.session.cookies]}")
+    print(f"  csrf-token header set: "
+          f"{'csrf-token' in api.client.session.headers}")
+
+
 def main():
     api = authenticate()
+
+    diagnose(api)
 
     print(f"Fetching profile: {PROFILE_ID}")
     try:
         profile = api.get_profile(PROFILE_ID)
     except Exception as e:
-        print(f"ERROR: profile fetch failed — {e}")
+        print(f"ERROR: profile fetch failed — KeyError {e}")
+        print("This usually means LinkedIn returned an error response. "
+              "Check the diagnostic above.")
         sys.exit(1)
 
     if not profile:
