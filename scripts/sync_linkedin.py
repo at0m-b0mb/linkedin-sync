@@ -79,10 +79,11 @@ def clean(text):
 def build_cookie_jar(li_at, jsessionid):
     jar = RequestsCookieJar()
     jar.set("li_at", li_at, domain=".linkedin.com", path="/")
-    # JSESSIONID arrives wrapped in quotes from the browser; the library
-    # strips them, but we store the raw value either way.
-    jar.set("JSESSIONID", jsessionid.strip('"'),
-            domain=".linkedin.com", path="/")
+    # JSESSIONID MUST be sent to LinkedIn wrapped in literal double-quotes —
+    # that's how LinkedIn issues it. Browsers may show the value with or
+    # without quotes in DevTools; normalize so it always has them on the wire.
+    js = jsessionid.strip('"')
+    jar.set("JSESSIONID", f'"{js}"', domain=".linkedin.com", path="/")
     return jar
 
 
