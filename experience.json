@@ -1,0 +1,50 @@
+[
+  {
+    "date": "Jan 2025 \u2014 Jun 2025",
+    "title": "Cyber Security Research Intern",
+    "company": "IIT Madras",
+    "description": "Research on Hardware Security Modules (HSMs) and FIDO-based biometric authentication. Developing India's first biometric-based HSM key built on the Shakti IC processor."
+  },
+  {
+    "date": "Apr 2023 \u2014 Jan 2025",
+    "title": "Co-Founder (mIsolate)",
+    "company": "DigitalFortress Private Limited",
+    "description": "Built Secure Desktop as a Service (DaaS), Zero-Trust Browser Isolation, and Application Streaming solutions for enterprise clients."
+  },
+  {
+    "date": "Jan 2023 \u2014 Jan 2025",
+    "title": "Penetration Tester",
+    "company": "DigitalFortress Private Limited",
+    "description": "Enhanced organizational security posture by 40%. Led compliance initiatives for ISO 27001, GDPR, and NIST frameworks."
+  },
+  {
+    "date": "Sep 2023 \u2014 Nov 2023",
+    "title": "Critical Infrastructure Cyber Security Engineer",
+    "company": "NHPC Limited",
+    "description": "Safeguarded India's national power grid infrastructure. Worked on Industrial Control Systems (ICS) security and SCADA protections."
+  },
+  {
+    "date": "Oct 2023 \u2014 Present",
+    "title": "YouTube Educator",
+    "company": "HackProKP \u2014 YouTube",
+    "description": "Creating free ethical hacking and cybersecurity education content. Building a community of aspiring security professionals."
+  },
+  {
+    "date": "Aug 2022 \u2014 Jul 2023",
+    "title": "Head of Technical Department",
+    "company": "Null (InfoSec) Chapter",
+    "description": "Led the technical department of the Null InfoSec community chapter, organizing workshops, CTF events, and security talks."
+  },
+  {
+    "date": "Nov 2021 \u2014 Jan 2023",
+    "title": "Security Analyst",
+    "company": "Mukham India",
+    "description": "Performed security analysis and vulnerability assessments for the organization's digital infrastructure."
+  },
+  {
+    "date": "Apr 2021 \u2014 Jan 2025",
+    "title": "Community Lead",
+    "company": "IIC VITAP",
+    "description": "Led the Institution's Innovation Council community, driving technical initiatives and innovation programs."
+  }
+]
