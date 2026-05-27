@@ -39,7 +39,7 @@ jobs:
           if git diff --quiet -- '*.json'; then
             echo "No profile changes since last run."
           else
-            git add profile.json experience.json education.json skills.json
+            git add profile.json experience.json
             git commit -m "chore: sync LinkedIn profile [skip ci]"
             git push
           fi

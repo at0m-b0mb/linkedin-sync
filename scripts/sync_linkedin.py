@@ -17,14 +17,20 @@ How to get them:
   4. Cookies expire roughly every year — refresh when the workflow starts failing.
 
 Outputs (repo root):
-  profile.json     — headline, about, location, picture
+  profile.json     — name, headline, picture, profile URL
   experience.json  — list of positions
-  education.json   — list of schools
-  skills.json      — list of endorsed skills
 
 If LinkedIn returns an empty or error response, the script exits non-zero
 WITHOUT touching the existing JSON files. The portfolio site keeps showing
 the last good data instead of breaking.
+
+Endpoints used:
+  /voyager/api/me                                 — identity (still works)
+  /voyager/api/graphql?...sectionType:experience  — experience (still works)
+
+The older /identity/profiles/{vanity}/profileView endpoint is dead — LinkedIn
+returns an error structure that breaks the linkedin-api library's parser. We
+avoid it entirely by going through the URN-based GraphQL path.
 """
 
 import json
@@ -44,36 +50,11 @@ except ImportError:
 PROFILE_ID = os.environ.get("LINKEDIN_PROFILE_ID", "kailash-parshad").strip()
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-
-def fmt_date(d):
-    if not d:
-        return ""
-    month = d.get("month")
-    year = d.get("year")
-    if not year:
-        return ""
-    if not month:
-        return str(year)
-    return f"{MONTHS[month - 1]} {year}"
-
-
-def fmt_period(tp):
-    if not tp:
-        return ""
-    start = fmt_date(tp.get("startDate"))
-    end = fmt_date(tp.get("endDate")) or "Present"
-    if not start:
-        return end
-    return f"{start} — {end}"
-
 
 def clean(text):
     if not text:
         return ""
-    return re.sub(r"\s+", " ", text).strip()
+    return re.sub(r"\s+", " ", str(text)).strip()
 
 
 def build_cookie_jar(li_at, jsessionid):
@@ -81,7 +62,7 @@ def build_cookie_jar(li_at, jsessionid):
     jar.set("li_at", li_at, domain=".linkedin.com", path="/")
     # JSESSIONID MUST be sent to LinkedIn wrapped in literal double-quotes —
     # that's how LinkedIn issues it. Browsers may show the value with or
-    # without quotes in DevTools; normalize so it always has them on the wire.
+    # without quotes; normalize so it always has them on the wire.
     js = jsessionid.strip('"')
     jar.set("JSESSIONID", f'"{js}"', domain=".linkedin.com", path="/")
     return jar
@@ -105,141 +86,120 @@ def authenticate():
         sys.exit(1)
 
 
-def extract_experience(profile):
-    out = []
-    for pos in profile.get("experience", []) or []:
-        title = clean(pos.get("title"))
-        company = clean(pos.get("companyName"))
-        if not title or not company:
-            continue
-        out.append({
-            "date": fmt_period(pos.get("timePeriod", {})),
-            "title": title,
-            "company": company,
-            "location": clean(pos.get("locationName")),
-            "description": clean(pos.get("description")),
-        })
-    return out
+def fetch_me(api):
+    """Hit /voyager/api/me to get identity info + URN.
+
+    This is the only endpoint we can rely on for identity since LinkedIn
+    killed /identity/profiles/{vanity}/profileView.
+    """
+    res = api.client.session.get("https://www.linkedin.com/voyager/api/me")
+    if res.status_code != 200:
+        print(f"ERROR: /voyager/api/me returned HTTP {res.status_code}")
+        print(f"Body snippet: {res.text[:300]!r}")
+        sys.exit(1)
+    return res.json()
 
 
-def extract_education(profile):
-    out = []
-    for edu in profile.get("education", []) or []:
-        school = clean(edu.get("schoolName"))
-        if not school:
-            continue
-        out.append({
-            "date": fmt_period(edu.get("timePeriod", {})),
-            "school": school,
-            "degree": clean(edu.get("degreeName")),
-            "field": clean(edu.get("fieldOfStudy")),
-            "description": clean(edu.get("description")),
-        })
-    return out
+def extract_urn(me):
+    """Pull the URN ID out of the /me response.
+
+    The URN looks like `urn:li:fsd_profile:ACoAA...`. We return the trailing
+    identifier (everything after the last colon) since that's what
+    get_profile_experiences expects.
+    """
+    mini = me.get("miniProfile", {})
+    urn = mini.get("dashEntityUrn") or mini.get("entityUrn", "")
+    if not urn or ":" not in urn:
+        print(f"ERROR: could not find URN in /me response. Keys: {list(me.keys())}")
+        sys.exit(1)
+    return urn.rsplit(":", 1)[-1]
 
 
-def extract_skills(api, profile_id):
-    try:
-        raw = api.get_profile_skills(public_id=profile_id) or []
-    except Exception as e:
-        print(f"WARN: could not fetch skills — {e}")
-        return []
-    out = []
-    for s in raw:
-        name = clean(s.get("name"))
-        if name:
-            out.append({"name": name})
-    return out
+def build_profile(me):
+    mini = me.get("miniProfile", {}) or {}
+    first = clean(mini.get("firstName"))
+    last = clean(mini.get("lastName"))
+    headline = clean(mini.get("occupation"))
 
-
-def extract_summary(profile):
-    pic = ""
-    pic_root = profile.get("displayPictureUrl")
-    artifacts = profile.get("profilePicture", {}).get(
-        "displayImageReference", {}
-    ).get("vectorImage", {}).get("artifacts", []) if isinstance(
-        profile.get("profilePicture"), dict
-    ) else []
-    if pic_root and (profile.get("img_400_400") or profile.get("img_200_200")):
-        pic = pic_root + (profile.get("img_400_400") or profile.get("img_200_200"))
-    elif artifacts:
-        # fall back to the largest available artifact
+    picture_url = ""
+    pic = mini.get("picture") or {}
+    vector = pic.get("com.linkedin.common.VectorImage") or {}
+    root = vector.get("rootUrl", "")
+    artifacts = vector.get("artifacts", []) or []
+    if root and artifacts:
         biggest = max(artifacts, key=lambda a: a.get("width", 0))
-        pic = biggest.get("fileIdentifyingUrlPathSegment", "")
+        picture_url = root + biggest.get("fileIdentifyingUrlPathSegment", "")
 
     return {
-        "name": clean(
-            f"{profile.get('firstName', '')} {profile.get('lastName', '')}"
-        ),
-        "headline": clean(profile.get("headline")),
-        "summary": clean(profile.get("summary")),
-        "location": clean(profile.get("locationName")
-                          or profile.get("geoLocationName")),
-        "industry": clean(profile.get("industryName")),
-        "picture": pic,
+        "name": clean(f"{first} {last}"),
+        "headline": headline,
+        "picture": picture_url,
         "profile_url": f"https://www.linkedin.com/in/{PROFILE_ID}/",
     }
+
+
+def fetch_experience(api, urn_id):
+    """Call the GraphQL experiences endpoint via the library."""
+    try:
+        return api.get_profile_experiences(urn_id=urn_id) or []
+    except Exception as e:
+        print(f"ERROR: experience fetch failed — {type(e).__name__}: {e}")
+        return []
+
+
+def format_experience(raw_items):
+    """Normalize the library's GraphQL response shape into our JSON contract."""
+    out = []
+    for item in raw_items:
+        title = clean(item.get("title"))
+        company = clean(item.get("companyName") or item.get("employmentType"))
+        if not title or not company:
+            continue
+        start = clean(item.get("startDate"))
+        end = clean(item.get("endDate")) or "Present"
+        date = f"{start} — {end}" if start else end
+        out.append({
+            "date": date,
+            "title": title,
+            "company": company,
+            "location": clean(item.get("locationName")),
+            "description": clean(item.get("description")),
+        })
+    return out
 
 
 def write_json(name, data):
     path = REPO_ROOT / name
     with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print(f"Wrote {len(data) if isinstance(data, list) else 'profile'} → {name}")
-
-
-def diagnose(api):
-    """Make a raw call to the Voyager API and print what LinkedIn returns.
-
-    Helps debug auth failures since the library swallows error responses.
-    """
-    print("Diagnostic: calling /voyager/api/me ...")
-    res = api.client.session.get(
-        "https://www.linkedin.com/voyager/api/me",
-        cookies=api.client.session.cookies,
-        headers=api.client.session.headers,
-    )
-    print(f"  HTTP {res.status_code} — {len(res.content)} bytes")
-    body = res.text[:500]
-    print(f"  Body snippet: {body!r}")
-    print(f"  Cookies sent: {[c.name for c in api.client.session.cookies]}")
-    print(f"  csrf-token header set: "
-          f"{'csrf-token' in api.client.session.headers}")
+    size = len(data) if isinstance(data, list) else "object"
+    print(f"Wrote {size} → {name}")
 
 
 def main():
     api = authenticate()
 
-    diagnose(api)
+    print("Fetching identity via /voyager/api/me ...")
+    me = fetch_me(api)
+    urn_id = extract_urn(me)
+    print(f"Resolved URN: {urn_id}")
 
-    print(f"Fetching profile: {PROFILE_ID}")
-    try:
-        profile = api.get_profile(PROFILE_ID)
-    except Exception as e:
-        print(f"ERROR: profile fetch failed — KeyError {e}")
-        print("This usually means LinkedIn returned an error response. "
-              "Check the diagnostic above.")
-        sys.exit(1)
+    profile = build_profile(me)
+    print(f"  Name: {profile['name']!r}")
+    print(f"  Headline: {profile['headline']!r}")
 
-    if not profile:
-        print("ERROR: empty profile response. Cookies may be invalid.")
-        sys.exit(1)
+    print("Fetching experience via GraphQL ...")
+    raw_exp = fetch_experience(api, urn_id)
+    print(f"  Got {len(raw_exp)} raw experience items")
 
-    experience = extract_experience(profile)
-    education = extract_education(profile)
-    skills = extract_skills(api, PROFILE_ID)
-    summary = extract_summary(profile)
-
+    experience = format_experience(raw_exp)
     if not experience:
-        print("ERROR: no experience entries parsed. Refusing to overwrite "
-              "existing experience.json with an empty list.")
-        print("Profile keys returned:", list(profile.keys()))
+        print("ERROR: zero experience entries parsed. Refusing to overwrite "
+              "experience.json with an empty list.")
         sys.exit(1)
 
+    write_json("profile.json", profile)
     write_json("experience.json", experience)
-    write_json("education.json", education)
-    write_json("skills.json", skills)
-    write_json("profile.json", summary)
 
 
 if __name__ == "__main__":
