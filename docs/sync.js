@@ -141,20 +141,98 @@
   }
 
   async function fetchExperience(urn, vanity) {
-    // Don't DOM-scrape. LinkedIn rebuilds its CSS classes constantly.
-    // Instead fetch the dedicated experience-details page (which lists every
-    // position regardless of "show all" state) and pull the structured JSON
-    // out of the <code> tags LinkedIn embeds for client-side state hydration.
-    const target = vanity || extractVanityFromUrl();
-    if (!target) throw new Error('Could not determine your profile vanity URL.');
-    const url = `/in/${target}/details/experience/`;
-    log(`Fetching ${url} ...`);
-    const r = await fetch(url, { credentials: 'include' });
-    if (!r.ok) throw new Error(`Experience page → HTTP ${r.status}`);
-    const html = await r.text();
+    // Modern LinkedIn /details/experience/ ships only an SPA shell — no
+    // server-side hydration JSON. So we call the Voyager API directly the
+    // same way the page's JS does. We try a few known endpoint shapes and
+    // use whichever one responds successfully.
+    const fullUrn = `urn:li:fsd_profile:${urn}`;
+    const enc = encodeURIComponent(fullUrn);
 
-    const positions = extractPositionsFromHydrationJson(html);
-    console.log('[linkedin-sync] positions found in hydration:', positions);
+    const candidates = [
+      {
+        name: 'dash profilePositions q=viewee',
+        path: `/voyager/api/identity/dash/profilePositions?q=viewee&profileUrn=${enc}&count=100`,
+      },
+      {
+        name: 'rest profilePositions count=100',
+        path: `/voyager/api/identity/dash/profilePositions?q=viewee&profileUrn=${enc}`,
+      },
+      {
+        name: 'legacy positions by urn',
+        path: `/voyager/api/identity/profiles/${urn}/positions?count=100&start=0`,
+      },
+      {
+        name: 'legacy positionGroups by urn',
+        path: `/voyager/api/identity/profiles/${urn}/positionGroups?count=100&start=0`,
+      },
+    ];
+
+    for (const c of candidates) {
+      log(`Trying: ${c.name} ...`);
+      try {
+        const r = await fetch(c.path, {
+          credentials: 'include',
+          headers: {
+            'csrf-token': csrfFromCookie(),
+            'x-restli-protocol-version': '2.0.0',
+            'accept': 'application/vnd.linkedin.normalized+json+2.1',
+          },
+        });
+        console.log(`[linkedin-sync] ${c.name}: HTTP ${r.status}`);
+        if (!r.ok) continue;
+        const data = await r.json();
+        console.log(`[linkedin-sync] ${c.name} body:`, data);
+        const positions = extractPositionsFromVoyagerJson(data);
+        if (positions.length) {
+          console.log(`[linkedin-sync] ${c.name} → ${positions.length} positions`);
+          return positions;
+        }
+        console.log(`[linkedin-sync] ${c.name}: 200 OK but 0 positions parsed`);
+      } catch (err) {
+        console.log(`[linkedin-sync] ${c.name} threw:`, err.message);
+      }
+    }
+
+    // Last resort: fetch the details/experience HTML and look in case
+    // LinkedIn does ship hydration data for this specific page.
+    const target = vanity || extractVanityFromUrl();
+    if (target) {
+      log('All APIs failed; trying HTML hydration fallback ...');
+      try {
+        const r = await fetch(`/in/${target}/details/experience/`, { credentials: 'include' });
+        if (r.ok) {
+          const html = await r.text();
+          const positions = extractPositionsFromHydrationJson(html);
+          if (positions.length) return positions;
+        }
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  function extractPositionsFromVoyagerJson(data) {
+    const positions = [];
+    const seen = new Set();
+
+    // Normalized response: elements + included
+    const containers = [];
+    if (Array.isArray(data.elements)) containers.push(...data.elements);
+    if (Array.isArray(data.included)) containers.push(...data.included);
+    // Sometimes the payload itself is a list
+    if (Array.isArray(data)) containers.push(...data);
+
+    for (const item of containers) {
+      if (!item || typeof item !== 'object') continue;
+      const t = item.$type || item._type || '';
+      const looksLikePosition = /Position(?!Group)/.test(t) ||
+        (item.title && (item.companyName || item.companyUrn));
+      if (!looksLikePosition) continue;
+      if (!item.title && !item.companyName) continue;
+      const key = `${item.entityUrn || ''}|${item.title}|${item.companyName}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      positions.push(item);
+    }
     return positions;
   }
 
