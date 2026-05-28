@@ -47,10 +47,15 @@
 
     log('Fetching identity from /voyager/api/me ...');
     const me = await voyager('/voyager/api/me');
-    const mini = me.miniProfile || {};
+    console.log('[linkedin-sync] /me response:', me);
+    const mini = resolveMini(me);
+    if (!mini) {
+      throw new Error('Could not find miniProfile in /me response. ' +
+        'Open DevTools → Console to see the raw response (logged above).');
+    }
     const urnFull = mini.dashEntityUrn || mini.entityUrn || '';
-    const urn = urnFull.split(':').pop();
-    if (!urn) throw new Error('Could not extract URN from /me response');
+    const urn = (urnFull.split(':').pop() || '').trim();
+    if (!urn) throw new Error('Found miniProfile but no entityUrn/dashEntityUrn field.');
     const vanity = mini.publicIdentifier || extractVanityFromUrl();
 
     const profile = {
@@ -82,13 +87,33 @@
     const r = await fetch(path, {
       credentials: 'include',
       headers: {
-        'accept': 'application/vnd.linkedin.normalized+json+2.1',
         'csrf-token': csrfFromCookie(),
         'x-restli-protocol-version': '2.0.0',
       },
     });
     if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
     return r.json();
+  }
+
+  /**
+   * /voyager/api/me can come back in two shapes depending on Accept header
+   * and what tier of API was used. Find the miniProfile no matter where it
+   * lives.
+   */
+  function resolveMini(me) {
+    if (me && me.miniProfile && (me.miniProfile.entityUrn || me.miniProfile.dashEntityUrn)) {
+      return me.miniProfile;
+    }
+    // Normalized response: data is a graph reference, included is the array
+    // of resolved entities. Find the one tagged as a (mini)Profile.
+    if (Array.isArray(me?.included)) {
+      const mp = me.included.find(x => {
+        const t = (x.$type || x._type || '');
+        return /MiniProfile|Profile$/i.test(t) || (x.entityUrn || '').includes('miniProfile') || (x.entityUrn || '').includes('fsd_profile');
+      });
+      if (mp) return mp;
+    }
+    return null;
   }
 
   function csrfFromCookie() {
