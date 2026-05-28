@@ -39,11 +39,16 @@
 
 <p>This is the bookmarklet — drag it (don't click it on this page; it only works when you're on LinkedIn):</p>
 
-<p><a class="bm" id="bm" href="javascript:void(fetch('https://at0m-b0mb.github.io/linkedin-sync/sync.js').then(r=>r.text()).then(eval));">📥&nbsp;&nbsp;Sync LinkedIn → GitHub</a></p>
+<p><a class="bm" id="bm" href="javascript:void(0)">📥&nbsp;&nbsp;Sync LinkedIn → GitHub</a></p>
 
 <div class="note">
-  Browsers won't let you drag a <code>javascript:</code> link from some pages. If the drag doesn't work, right-click the button → <i>Bookmark link</i>, or manually create a bookmark with this exact URL as the address:
-  <pre id="bm-src" style="user-select: all"></pre>
+  Browsers won't let you drag a <code>javascript:</code> link from some pages. If the drag doesn't fly, the cleanest fallback is:
+  <ol>
+    <li>Right-click an empty area of your bookmarks bar → <b>Add page…</b></li>
+    <li>Name: <code>Sync LinkedIn → GitHub</code></li>
+    <li>URL: <b>copy the entire string below</b> (click inside, Cmd+A, Cmd+C):</li>
+  </ol>
+  <pre id="bm-src" style="user-select: all; max-height: 200px;">Generating…</pre>
 </div>
 
 <h2>3. Use it</h2>
@@ -72,7 +77,17 @@ const [profile, experience] = await Promise.all([
 <pre>localStorage.removeItem('linkedin_sync_pat_v1');</pre>
 
 <script>
-  document.getElementById('bm-src').textContent = document.getElementById('bm').getAttribute('href');
+  // Build a fully self-contained bookmarklet by inlining sync.js (fetched
+  // here on the GitHub Pages origin — same-origin fetch, no CSP issue).
+  // LinkedIn's CSP would otherwise block both the cross-origin fetch and
+  // the eval call in the simpler "loader" version.
+  fetch('sync.js').then(r => r.text()).then(src => {
+    const bm = 'javascript:' + encodeURIComponent('(function(){' + src + '})();');
+    document.getElementById('bm').setAttribute('href', bm);
+    document.getElementById('bm-src').textContent = bm;
+  }).catch(err => {
+    document.getElementById('bm-src').textContent = 'Failed to load sync.js: ' + err;
+  });
 </script>
 
 </body>
