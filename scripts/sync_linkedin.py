@@ -92,7 +92,18 @@ def fetch_me(api):
     This is the only endpoint we can rely on for identity since LinkedIn
     killed /identity/profiles/{vanity}/profileView.
     """
-    res = api.client.session.get("https://www.linkedin.com/voyager/api/me")
+    res = api.client.session.get(
+        "https://www.linkedin.com/voyager/api/me",
+        allow_redirects=False,
+    )
+    if res.status_code in (301, 302, 303, 307, 308):
+        print(f"ERROR: /voyager/api/me redirected (HTTP {res.status_code}) → "
+              f"{res.headers.get('Location', '<no Location>')}")
+        print("This means LinkedIn does not recognize the session. Your "
+              "li_at / JSESSIONID secrets are invalid or have been "
+              "invalidated. Get fresh cookies from your browser DevTools and "
+              "update the GitHub secrets.")
+        sys.exit(1)
     if res.status_code != 200:
         print(f"ERROR: /voyager/api/me returned HTTP {res.status_code}")
         print(f"Body snippet: {res.text[:300]!r}")
