@@ -85,6 +85,13 @@ const [profile, experience] = await Promise.all([
     const bm = 'javascript:' + encodeURIComponent('(function(){' + src + '})();');
     document.getElementById('bm').setAttribute('href', bm);
     document.getElementById('bm-src').textContent = bm;
+    const m = src.match(/VERSION\s*=\s*['"]([^'"]+)['"]/);
+    if (m) {
+      const v = document.createElement('p');
+      v.style.cssText = 'color:#0a66c2;font-weight:600;margin:8px 0;';
+      v.textContent = `Bookmarklet version: ${m[1]} (size: ${(bm.length/1024).toFixed(1)} KB)`;
+      document.getElementById('bm').after(v);
+    }
   }).catch(err => {
     document.getElementById('bm-src').textContent = 'Failed to load sync.js: ' + err;
   });

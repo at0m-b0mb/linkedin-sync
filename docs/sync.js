@@ -9,6 +9,8 @@
  * so we don't have to inline all of this into the javascript: URL.
  */
 (async () => {
+  const VERSION = 'v4-voyager-api';  // bump on every behavioural change
+  console.log(`[linkedin-sync] bookmarklet ${VERSION}`);
   const REPO = 'at0m-b0mb/linkedin-sync';
   const BRANCH = 'main';
   const TOKEN_KEY = 'linkedin_sync_pat_v1';
