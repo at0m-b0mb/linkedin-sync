@@ -159,36 +159,56 @@
   }
 
   /**
-   * Walk every <code id="bpr-guid-*"> block on the page; each one contains a
-   * Voyager API response (JSON). The /details/experience/ page hydrates with
-   * a response whose `included` array lists all Position entities. Find them.
+   * Walk every JSON-bearing block on the page (LinkedIn hydration). Look for
+   * Voyager API responses whose `included` array contains Position entities.
+   *
+   * LinkedIn has used several hydration tag formats over the years:
+   *   <code id="bpr-guid-*">...</code>          (classic BigPipe)
+   *   <code id="datalet-bpr-guid-*">...</code>  (variant)
+   *   <script type="application/json">...</script>  (Next.js-style)
+   * We try them all and combine the results.
    */
   function extractPositionsFromHydrationJson(html) {
+    const blocks = [];
+
+    const patterns = [
+      /<code[^>]*id="bpr-guid-[^"]*"[^>]*>([\s\S]*?)<\/code>/g,
+      /<code[^>]*id="datalet-bpr-guid-[^"]*"[^>]*>([\s\S]*?)<\/code>/g,
+      /<script[^>]+type="application\/json"[^>]*>([\s\S]*?)<\/script>/g,
+    ];
+    for (const re of patterns) {
+      let m;
+      while ((m = re.exec(html))) blocks.push(m[1]);
+    }
+    console.log(`[linkedin-sync] hydration blocks found: ${blocks.length}`);
+
     const positions = [];
     const seen = new Set();
-    // Match <code id="bpr-guid-..."> ... </code> blocks.
-    const re = /<code[^>]*id="bpr-guid-[^"]*"[^>]*>([\s\S]*?)<\/code>/g;
-    let m;
-    while ((m = re.exec(html))) {
+    const typeCounts = {};
+
+    for (const raw of blocks) {
+      const decoded = raw.replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'");
       let json;
-      try {
-        // HTML-entity-decode the contents before parsing.
-        const raw = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'");
-        json = JSON.parse(raw);
-      } catch (_) { continue; }
+      try { json = JSON.parse(decoded); }
+      catch (_) { continue; }
+
       const included = json.included || [];
       for (const item of included) {
         const t = item.$type || item._type || '';
+        typeCounts[t] = (typeCounts[t] || 0) + 1;
         if (!/Position|profile\.Position/.test(t)) continue;
-        // Some `Position` entities are part of a group/aggregation — pick the
-        // ones with an actual title or companyName field.
         if (!item.title && !item.companyName) continue;
         const key = `${item.entityUrn || ''}|${item.title}|${item.companyName}`;
         if (seen.has(key)) continue;
         seen.add(key);
         positions.push(item);
       }
+    }
+
+    if (!positions.length) {
+      console.log('[linkedin-sync] no Position entities found. ' +
+        'Entity type counts seen across all blocks:', typeCounts);
     }
     return positions;
   }
