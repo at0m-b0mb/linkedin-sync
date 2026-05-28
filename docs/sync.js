@@ -9,7 +9,7 @@
  * so we don't have to inline all of this into the javascript: URL.
  */
 (async () => {
-  const VERSION = 'v7-fix-tdz';  // bump on every behavioural change
+  const VERSION = 'v8-sort-recency';  // bump on every behavioural change
   console.log(`[linkedin-sync] bookmarklet ${VERSION}`);
   const REPO = 'at0m-b0mb/linkedin-sync';
   const BRANCH = 'main';
@@ -79,6 +79,7 @@
       throw new Error('No experience entries parsed. ' +
         'Open DevTools → Console: see the [linkedin-sync] log lines for what was returned.');
     }
+    sortByRecency(experience);
 
     log(`Got ${experience.length} positions. Opening commit window ...`);
     await commitViaPopup(token, profile, experience);
@@ -332,6 +333,39 @@
     // Dash returns rich text as { text: "...", attributes: [...] }
     if (typeof field === 'object' && typeof field.text === 'string') return field.text;
     return '';
+  }
+
+  /**
+   * Sort positions in reverse-chronological order — current roles first,
+   * then most-recently-ended. Operates in-place. Parses the formatted `date`
+   * string ("Jan 2025 — Jun 2025" or "Oct 2023 — Present") since we don't
+   * keep the raw {month, year} objects after formatting.
+   */
+  function sortByRecency(items) {
+    const MONTH_IDX = Object.fromEntries(MONTHS.map((m, i) => [m, i + 1]));
+    const ONGOING = [9999, 13];
+    function parseSide(s) {
+      if (!s) return [0, 0];
+      s = s.trim();
+      if (/present/i.test(s)) return null; // null = ongoing → sorts highest
+      const m = s.match(/(\w{3})\s+(\d{4})/);
+      if (m) return [parseInt(m[2], 10), MONTH_IDX[m[1]] || 0];
+      const y = s.match(/(\d{4})/);
+      return y ? [parseInt(y[1], 10), 1] : [0, 0];
+    }
+    function key(p) {
+      const parts = (p.date || '').split(/\s*—\s*|\s*-\s*/);
+      const start = parseSide(parts[0]) || [0, 0];
+      const end = parseSide(parts[1] || '') || ONGOING;
+      return [end[0], end[1], start[0], start[1]];
+    }
+    items.sort((a, b) => {
+      const ka = key(a), kb = key(b);
+      for (let i = 0; i < ka.length; i++) {
+        if (ka[i] !== kb[i]) return kb[i] - ka[i];
+      }
+      return 0;
+    });
   }
 
   function formatPosition(p) {
