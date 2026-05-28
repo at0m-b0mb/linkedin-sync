@@ -9,11 +9,15 @@
  * so we don't have to inline all of this into the javascript: URL.
  */
 (async () => {
-  const VERSION = 'v6-flexible-dates';  // bump on every behavioural change
+  const VERSION = 'v7-fix-tdz';  // bump on every behavioural change
   console.log(`[linkedin-sync] bookmarklet ${VERSION}`);
   const REPO = 'at0m-b0mb/linkedin-sync';
   const BRANCH = 'main';
   const TOKEN_KEY = 'linkedin_sync_pat_v1';
+  // Declared up here because formatPosition references it during the async
+  // flow above the bottom-of-file helper definitions. `const`'s temporal
+  // dead zone would throw otherwise.
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   const $banner = (() => {
     const el = document.createElement('div');
@@ -292,7 +296,6 @@
     return positions;
   }
 
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function fmtDate(d) {
     if (!d || !d.year) return '';
     return d.month ? `${MONTHS[d.month - 1]} ${d.year}` : `${d.year}`;
