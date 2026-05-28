@@ -67,8 +67,12 @@
     };
 
     log(`Identity: ${profile.name}\nFetching experience ...`);
-    const experience = await fetchExperience(urn);
-    if (!experience.length) throw new Error('No experience entries parsed. Are you on your own profile?');
+    const rawPositions = await fetchExperience(urn, vanity);
+    const experience = rawPositions.map(formatPosition).filter(Boolean);
+    if (!experience.length) {
+      throw new Error('No experience entries parsed. ' +
+        'Open DevTools → Console: see the [linkedin-sync] log lines for what was returned.');
+    }
 
     log(`Got ${experience.length} positions. Committing to GitHub ...`);
     await commit(token, 'profile.json', profile);
@@ -136,66 +140,82 @@
     return pic.rootUrl + (biggest.fileIdentifyingUrlPathSegment || '');
   }
 
-  async function fetchExperience(urn) {
-    // The profile page itself embeds the data we need. When the user is
-    // viewing their own profile, LinkedIn renders experience cards in
-    // .pv-profile-section / artdeco-card components. We parse the DOM
-    // directly rather than chase a moving GraphQL queryId.
-    if (!location.pathname.includes('/in/')) {
-      throw new Error('Navigate to your LinkedIn profile page first (linkedin.com/in/your-vanity/).');
+  async function fetchExperience(urn, vanity) {
+    // Don't DOM-scrape. LinkedIn rebuilds its CSS classes constantly.
+    // Instead fetch the dedicated experience-details page (which lists every
+    // position regardless of "show all" state) and pull the structured JSON
+    // out of the <code> tags LinkedIn embeds for client-side state hydration.
+    const target = vanity || extractVanityFromUrl();
+    if (!target) throw new Error('Could not determine your profile vanity URL.');
+    const url = `/in/${target}/details/experience/`;
+    log(`Fetching ${url} ...`);
+    const r = await fetch(url, { credentials: 'include' });
+    if (!r.ok) throw new Error(`Experience page → HTTP ${r.status}`);
+    const html = await r.text();
+
+    const positions = extractPositionsFromHydrationJson(html);
+    console.log('[linkedin-sync] positions found in hydration:', positions);
+    return positions;
+  }
+
+  /**
+   * Walk every <code id="bpr-guid-*"> block on the page; each one contains a
+   * Voyager API response (JSON). The /details/experience/ page hydrates with
+   * a response whose `included` array lists all Position entities. Find them.
+   */
+  function extractPositionsFromHydrationJson(html) {
+    const positions = [];
+    const seen = new Set();
+    // Match <code id="bpr-guid-..."> ... </code> blocks.
+    const re = /<code[^>]*id="bpr-guid-[^"]*"[^>]*>([\s\S]*?)<\/code>/g;
+    let m;
+    while ((m = re.exec(html))) {
+      let json;
+      try {
+        // HTML-entity-decode the contents before parsing.
+        const raw = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'");
+        json = JSON.parse(raw);
+      } catch (_) { continue; }
+      const included = json.included || [];
+      for (const item of included) {
+        const t = item.$type || item._type || '';
+        if (!/Position|profile\.Position/.test(t)) continue;
+        // Some `Position` entities are part of a group/aggregation — pick the
+        // ones with an actual title or companyName field.
+        if (!item.title && !item.companyName) continue;
+        const key = `${item.entityUrn || ''}|${item.title}|${item.companyName}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        positions.push(item);
+      }
     }
-
-    // Make sure the experience section is expanded. Click "Show all" if present.
-    const showAll = [...document.querySelectorAll('a, button')]
-      .find(el => /show all .* experiences/i.test(el.textContent || ''));
-    if (showAll) showAll.click();
-    await wait(800);
-
-    // Each top-level position is a <li> inside the experience section.
-    const expSection = findSection('experience');
-    if (!expSection) throw new Error('Could not find Experience section on this page.');
-
-    const items = expSection.querySelectorAll('li.artdeco-list__item, li.pvs-list__paged-list-item');
-    const out = [];
-    items.forEach(li => {
-      const entry = parseExperienceItem(li);
-      if (entry) out.push(entry);
-    });
-    return out;
+    return positions;
   }
 
-  function findSection(name) {
-    const sections = [...document.querySelectorAll('section')];
-    return sections.find(s => {
-      const id = (s.id || '').toLowerCase();
-      if (id.includes(name)) return true;
-      const h = s.querySelector('h2, h3, [role="heading"]');
-      return h && h.textContent.toLowerCase().includes(name);
-    });
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtDate(d) {
+    if (!d || !d.year) return '';
+    return d.month ? `${MONTHS[d.month - 1]} ${d.year}` : `${d.year}`;
+  }
+  function fmtPeriod(tp) {
+    if (!tp) return '';
+    const s = fmtDate(tp.startDate);
+    const e = fmtDate(tp.endDate) || 'Present';
+    return s ? `${s} — ${e}` : e;
   }
 
-  function parseExperienceItem(li) {
-    const t = sel => {
-      const e = li.querySelector(sel);
-      return e ? e.innerText.replace(/\s+/g, ' ').trim() : '';
+  function formatPosition(p) {
+    const title = (p.title || '').trim();
+    const company = (p.companyName || '').trim();
+    if (!title || !company) return null;
+    return {
+      date: fmtPeriod(p.timePeriod),
+      title,
+      company,
+      location: (p.locationName || '').trim(),
+      description: (p.description || '').replace(/\s+/g, ' ').trim(),
     };
-    // LinkedIn marks visually-hidden duplicate text with .visually-hidden;
-    // use those when present because they hold the canonical strings.
-    const bold = li.querySelector('.t-bold span[aria-hidden="true"], .t-bold');
-    const subtitleEls = li.querySelectorAll('.t-14.t-normal span[aria-hidden="true"]');
-    const captionEls = li.querySelectorAll('.t-14.t-normal.t-black--light span[aria-hidden="true"]');
-
-    const title = bold ? bold.innerText.trim() : '';
-    if (!title) return null;
-    const company = (subtitleEls[0] ? subtitleEls[0].innerText : '').split('·')[0].trim();
-    const dateRaw = captionEls[0] ? captionEls[0].innerText : '';
-    const location = captionEls[1] ? captionEls[1].innerText.trim() : '';
-    const desc = t('.pvs-list__outer-container .inline-show-more-text--is-collapsed, .pv-shared-text-with-see-more, .display-flex.full-width .t-14.t-normal.t-black .pvs-list__outer-container');
-
-    // dateRaw is usually "Jan 2025 - Jun 2025 · 6 mos" — strip the duration suffix.
-    const date = dateRaw.split('·')[0].trim().replace(/\s*-\s*/, ' — ');
-
-    return { date, title, company, location, description: desc };
   }
 
   function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
