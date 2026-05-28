@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>linkedin-sync · setup</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body { font: 15px/1.5 -apple-system, system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #222; }
+  h1 { margin-bottom: 4px; }
+  h1 + p { color: #666; margin-top: 0; }
+  code, pre { background: #f4f4f4; padding: 2px 5px; border-radius: 4px; font-size: 13px; }
+  pre { padding: 12px; overflow: auto; }
+  ol li { margin-bottom: 12px; }
+  .bm {
+    display: inline-block; padding: 10px 16px; background: #0a66c2; color: #fff;
+    border-radius: 6px; text-decoration: none; font-weight: 600; margin: 10px 0;
+  }
+  .bm:hover { background: #084e96; }
+  .note { background: #fff8e1; border-left: 3px solid #f4b400; padding: 10px 14px; margin: 14px 0; }
+  .warn { background: #ffe9e9; border-left: 3px solid #d33; padding: 10px 14px; margin: 14px 0; }
+  input[type=text] { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<h1>linkedin-sync</h1>
+<p>One-click sync from your LinkedIn profile to the JSON files your portfolio reads.</p>
+
+<h2>1. Create a GitHub Personal Access Token</h2>
+<ol>
+  <li>Go to <a href="https://github.com/settings/tokens?type=beta" target="_blank">github.com/settings/tokens (fine-grained)</a> → <b>Generate new token</b>.</li>
+  <li>Name it <code>linkedin-sync</code>. Expiration: your choice (1 year is fine).</li>
+  <li><b>Repository access</b> → <i>Only select repositories</i> → choose <code>at0m-b0mb/linkedin-sync</code>.</li>
+  <li><b>Permissions → Repository permissions → Contents → Read and write</b>. That's the only scope you need.</li>
+  <li>Generate, copy the token (starts with <code>github_pat_…</code>).</li>
+</ol>
+
+<h2>2. Drag this to your bookmarks bar</h2>
+
+<p>This is the bookmarklet — drag it (don't click it on this page; it only works when you're on LinkedIn):</p>
+
+<p><a class="bm" id="bm" href="javascript:void(fetch('https://at0m-b0mb.github.io/linkedin-sync/sync.js').then(r=>r.text()).then(eval));">📥&nbsp;&nbsp;Sync LinkedIn → GitHub</a></p>
+
+<div class="note">
+  Browsers won't let you drag a <code>javascript:</code> link from some pages. If the drag doesn't work, right-click the button → <i>Bookmark link</i>, or manually create a bookmark with this exact URL as the address:
+  <pre id="bm-src" style="user-select: all"></pre>
+</div>
+
+<h2>3. Use it</h2>
+<ol>
+  <li>Log in to LinkedIn in your browser.</li>
+  <li>Navigate to your own profile: <code>https://www.linkedin.com/in/kailash-parshad/</code></li>
+  <li>Click <b>"Show all experiences"</b> so the section is fully expanded (the bookmarklet will try to click it for you, but doing it manually is a safe sanity check).</li>
+  <li>Click the <b>Sync LinkedIn → GitHub</b> bookmark.</li>
+  <li>First time only: paste your GitHub PAT when prompted. It's stored in <code>localStorage</code> scoped to <code>linkedin.com</code> — your PAT never leaves your browser except when going to GitHub.</li>
+  <li>A black banner appears in the top-right showing progress. When it turns green: done. Your <code>profile.json</code> and <code>experience.json</code> are updated in the repo.</li>
+</ol>
+
+<div class="warn">
+  <b>Security note:</b> Use a <b>fine-grained</b> PAT scoped only to <code>at0m-b0mb/linkedin-sync</code> with only <i>Contents: read and write</i>. If you suspect it leaked, revoke it at <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a>. Never use a classic PAT or a token with broader scopes here.
+</div>
+
+<h2>How your website consumes the data</h2>
+<pre>const base = 'https://raw.githubusercontent.com/at0m-b0mb/linkedin-sync/main';
+const [profile, experience] = await Promise.all([
+  fetch(`${base}/profile.json`).then(r =&gt; r.json()),
+  fetch(`${base}/experience.json`).then(r =&gt; r.json()),
+]);</pre>
+
+<h2>To clear your stored PAT</h2>
+<p>In LinkedIn's tab → DevTools → Console:</p>
+<pre>localStorage.removeItem('linkedin_sync_pat_v1');</pre>
+
+<script>
+  document.getElementById('bm-src').textContent = document.getElementById('bm').getAttribute('href');
+</script>
+
+</body>
+</html>
