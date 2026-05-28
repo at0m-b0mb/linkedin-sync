@@ -9,7 +9,7 @@
  * so we don't have to inline all of this into the javascript: URL.
  */
 (async () => {
-  const VERSION = 'v5-popup-commit';  // bump on every behavioural change
+  const VERSION = 'v6-flexible-dates';  // bump on every behavioural change
   console.log(`[linkedin-sync] bookmarklet ${VERSION}`);
   const REPO = 'at0m-b0mb/linkedin-sync';
   const BRANCH = 'main';
@@ -297,24 +297,61 @@
     if (!d || !d.year) return '';
     return d.month ? `${MONTHS[d.month - 1]} ${d.year}` : `${d.year}`;
   }
-  function fmtPeriod(tp) {
-    if (!tp) return '';
-    const s = fmtDate(tp.startDate);
-    const e = fmtDate(tp.endDate) || 'Present';
+  function fmtPeriod(start, end) {
+    const s = fmtDate(start);
+    const e = fmtDate(end) || 'Present';
     return s ? `${s} — ${e}` : e;
   }
 
+  /**
+   * The dash Voyager API returns dates in several different shapes depending
+   * on which endpoint and which entity version. Try each known shape.
+   */
+  function extractDates(p) {
+    // Shape 1: legacy { timePeriod: { startDate: {m,y}, endDate: {m,y} } }
+    if (p.timePeriod) {
+      return [p.timePeriod.startDate, p.timePeriod.endDate];
+    }
+    // Shape 2: dash { dateRange: { start: {m,y}, end: {m,y} } }
+    if (p.dateRange) {
+      return [p.dateRange.start, p.dateRange.end];
+    }
+    // Shape 3: split fields on the position itself
+    if (p.startedOn || p.endedOn) {
+      return [p.startedOn, p.endedOn];
+    }
+    return [null, null];
+  }
+
+  function extractText(field) {
+    if (!field) return '';
+    if (typeof field === 'string') return field;
+    // Dash returns rich text as { text: "...", attributes: [...] }
+    if (typeof field === 'object' && typeof field.text === 'string') return field.text;
+    return '';
+  }
+
   function formatPosition(p) {
-    const title = (p.title || '').trim();
-    const company = (p.companyName || '').trim();
+    const title = extractText(p.title).trim() ||
+                  extractText(p.titleV2 && p.titleV2.text).trim();
+    const company = extractText(p.companyName).trim() ||
+                    extractText(p.subtitle).trim() ||
+                    extractText(p.standardizedTitle).trim();
     if (!title || !company) return null;
-    return {
-      date: fmtPeriod(p.timePeriod),
-      title,
-      company,
-      location: (p.locationName || '').trim(),
-      description: (p.description || '').replace(/\s+/g, ' ').trim(),
-    };
+
+    const [start, end] = extractDates(p);
+    const date = fmtPeriod(start, end);
+    if (!date) {
+      console.log('[linkedin-sync] no date extracted for position, raw fields:',
+        Object.keys(p), 'sample:', p);
+    }
+
+    const location = extractText(p.locationName).trim() ||
+                     extractText(p.geoLocationName).trim() ||
+                     extractText(p.location).trim();
+    const description = extractText(p.description).replace(/\s+/g, ' ').trim();
+
+    return { date, title, company, location, description };
   }
 
   function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
