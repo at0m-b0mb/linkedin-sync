@@ -1,50 +1,100 @@
 [
   {
-    "date": "Jan 2025 \u2014 Jun 2025",
-    "title": "Cyber Security Research Intern",
-    "company": "IIT Madras",
-    "description": "Research on Hardware Security Modules (HSMs) and FIDO-based biometric authentication. Developing India's first biometric-based HSM key built on the Shakti IC processor."
+    "date": "",
+    "title": "Head of Technical Department",
+    "company": "Null (InfoSec) Chapter - VIT-AP",
+    "location": "Andhra Pradesh, India",
+    "description": "Head of Technical Department and Cybersecurity Event Manager at the Null (InfoSec) Chapter, VIT-AP. Led planning and execution of cybersecurity workshops, seminars, and CTF competitions. Mentored students in hands-on security projects, collaborated with industry professionals, and promoted cybersecurity awareness across the college community."
   },
   {
-    "date": "Apr 2023 \u2014 Jan 2025",
-    "title": "Co-Founder (mIsolate)",
-    "company": "DigitalFortress Private Limited",
-    "description": "Built Secure Desktop as a Service (DaaS), Zero-Trust Browser Isolation, and Application Streaming solutions for enterprise clients."
+    "date": "",
+    "title": "Open Source Developer",
+    "company": "CSI VITAP CHAPTER",
+    "location": "Andhra Pradesh, India",
+    "description": "Open Source Developer at CSI VITAP Chapter, contributing to open-source projects and building custom web applications tailored to college department needs. Collaborated with the developer community through coding, documentation, and bug fixes. Mentored fellow students in open-source practices and received a Certificate of Appreciation for contributions."
   },
   {
-    "date": "Jan 2023 \u2014 Jan 2025",
+    "date": "",
     "title": "Penetration Tester",
     "company": "DigitalFortress Private Limited",
-    "description": "Enhanced organizational security posture by 40%. Led compliance initiatives for ISO 27001, GDPR, and NIST frameworks."
+    "location": "Andhra Pradesh, India",
+    "description": "Penetration Tester at DigitalFortress, conducting in-depth security assessments across web applications, network infrastructure, and cloud environments. Identified and remediated critical vulnerabilities, improving clients' overall security posture by 40%. Executed advanced vulnerability assessments including zero-day threat identification, ensured compliance with ISO 27001, GDPR, and NIST standards, and mentored junior penetration testers while collaborating with DevSecOps teams for rapid vulnerability resolution."
   },
   {
-    "date": "Sep 2023 \u2014 Nov 2023",
-    "title": "Critical Infrastructure Cyber Security Engineer",
-    "company": "NHPC Limited",
-    "description": "Safeguarded India's national power grid infrastructure. Worked on Industrial Control Systems (ICS) security and SCADA protections."
+    "date": "",
+    "title": "Youtube Educator",
+    "company": "YouTube",
+    "location": "Delhi, India",
+    "description": "YouTube Educator & Cybersecurity Content Creator at HackProKP — a free learning platform for ethical hacking and cybersecurity education. Produces tutorials on penetration testing, network security, web application security, and CTF challenges. Builds and mentors a community of aspiring cybersecurity professionals with practical, hands-on skills."
   },
   {
-    "date": "Oct 2023 \u2014 Present",
-    "title": "YouTube Educator",
-    "company": "HackProKP \u2014 YouTube",
-    "description": "Creating free ethical hacking and cybersecurity education content. Building a community of aspiring security professionals."
+    "date": "",
+    "title": "Student Coordinator",
+    "company": "VITimes",
+    "location": "Andhra Pradesh, India",
+    "description": "Student Coordinator at VITimes, the official college newspaper of VIT-AP. Managed event coverage, curated campus news content, coordinated publications, and handled social media outreach. Collaborated across departments to amplify student achievements and broaden VITimes' readership both on-campus and online."
   },
   {
-    "date": "Aug 2022 \u2014 Jul 2023",
-    "title": "Head of Technical Department",
-    "company": "Null (InfoSec) Chapter",
-    "description": "Led the technical department of the Null InfoSec community chapter, organizing workshops, CTF events, and security talks."
-  },
-  {
-    "date": "Nov 2021 \u2014 Jan 2023",
+    "date": "",
     "title": "Security Analyst",
     "company": "Mukham India",
-    "description": "Performed security analysis and vulnerability assessments for the organization's digital infrastructure."
+    "location": "Andhra Pradesh, India",
+    "description": "Security Analyst at Mukham India, conducting penetration testing on containerized applications and deploying SIEM solutions to strengthen threat detection. Improved container security in collaboration with DevOps teams, developed custom SIEM correlation rules reducing false positives by 20%, and boosted incident response efficiency by 30%. Investigated security breaches and implemented preventive countermeasures."
   },
   {
-    "date": "Apr 2021 \u2014 Jan 2025",
+    "date": "",
+    "title": "Critical Infrastructure Cyber Security Engineer",
+    "company": "NHPC Limited",
+    "location": "Sainj, Kullu, Himachal Pradesh, 175121, India",
+    "description": "Cybersecurity intern at NHPC Limited, India's leading hydroelectric power generation company. Gained hands-on exposure to securing critical power grid infrastructure, including air-gapped systems and Industrial Control Systems (ICS) governing turbine operations. Developed practical knowledge of OT/ICS security protocols and cybersecurity strategies for mission-critical national infrastructure."
+  },
+  {
+    "date": "",
+    "title": "Cyber Security Research Intern",
+    "company": "Indian Institute of Technology, Madras",
+    "location": "Chennai",
+    "description": "Cybersecurity Research Intern at IIT Madras, focusing on Hardware Security Modules (HSMs) with FIDO-based biometric authentication. Contributing to the development of India's first domestically manufactured biometric HSM key, built on the Shakti IC fabricated at IIT Madras. Research spans hardware security, passwordless authentication, and embedded systems security in a cutting-edge academic environment."
+  },
+  {
+    "date": "",
     "title": "Community Lead",
     "company": "IIC VITAP",
-    "description": "Led the Institution's Innovation Council community, driving technical initiatives and innovation programs."
+    "location": "Andhra Pradesh, India",
+    "description": "Community Lead at the Institute's Innovation Council (IIC), VIT-AP University, driving innovation, entrepreneurship, and incubation on campus. Organized APSCHE-supported faculty workshops and cross-functional events connecting students with industry experts. Championed startup initiatives and supported aspiring founders across the university ecosystem."
+  },
+  {
+    "date": "",
+    "title": "Co-Founder - mIsolate",
+    "company": "DigitalFortress Private Limited",
+    "location": "",
+    "description": "Co-Founder of mIsolate at DigitalFortress — a cybersecurity platform offering zero-trust browser isolation, Desktop-as-a-Service (DaaS), and containerized application streaming. Built a comprehensive security solution that eliminates traditional VPN dependency, protects against online threats, and supports DevSecOps workflows. Spearheaded product development, go-to-market strategy, and technical architecture for a platform serving both enterprise and personal security needs."
+  },
+  {
+    "date": "",
+    "title": "Delegate",
+    "company": "Startup Mahakumbh",
+    "location": "New Delhi",
+    "description": "Represented mIsolate (by DigitalFortress) as a Delegate at Startup Mahakumbh, India's largest startup event. Networked with entrepreneurs, investors, and industry leaders to showcase zero-trust browser isolation technology. Participated in panel discussions on emerging tech trends and had the opportunity to meet Prime Minister Modi while advocating for startup innovation in India."
+  },
+  {
+    "date": "",
+    "title": "Program Supervisor",
+    "company": "Null (InfoSec) Chapter - VIT-AP",
+    "location": "Andhra Pradesh, India",
+    "description": "Program Supervisor at the Null (InfoSec) Chapter, VIT-AP, overseeing cybersecurity program initiatives and supporting the technical team. Coordinated event logistics, guided members through security concepts, and ensured smooth execution of chapter activities promoting information security awareness on campus."
+  },
+  {
+    "date": "",
+    "title": "Head of Cyber Security",
+    "company": "vitopia.vitap",
+    "location": "Amaravati",
+    "description": "Head of Cyber Security at Vitopia, the annual technical fest of VIT-AP University. Led a dedicated security team to protect all digital assets and event infrastructure. Conducted risk assessments, formulated incident response plans, and trained event staff on cybersecurity best practices to ensure a secure, uninterrupted event."
+  },
+  {
+    "date": "",
+    "title": "Official Campus Ambassador",
+    "company": "International MUN",
+    "location": "Delhi, India",
+    "description": "Official Campus Ambassador for International MUN, promoting global MUN events through strategic social media campaigns and content creation. Grew event participation and online reach by engaging the student community, managing social media channels, and collaborating with organizers. Received a formal Letter of Commendation for exceptional performance and leadership."
   }
 ]
