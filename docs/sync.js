@@ -9,7 +9,7 @@
  * so we don't have to inline all of this into the javascript: URL.
  */
 (async () => {
-  const VERSION = 'v4-voyager-api';  // bump on every behavioural change
+  const VERSION = 'v5-popup-commit';  // bump on every behavioural change
   console.log(`[linkedin-sync] bookmarklet ${VERSION}`);
   const REPO = 'at0m-b0mb/linkedin-sync';
   const BRANCH = 'main';
@@ -76,9 +76,8 @@
         'Open DevTools → Console: see the [linkedin-sync] log lines for what was returned.');
     }
 
-    log(`Got ${experience.length} positions. Committing to GitHub ...`);
-    await commit(token, 'profile.json', profile);
-    await commit(token, 'experience.json', experience);
+    log(`Got ${experience.length} positions. Opening commit window ...`);
+    await commitViaPopup(token, profile, experience);
 
     log(`Done.\n• profile.json (${profile.name})\n• experience.json (${experience.length} entries)\nCommitted to ${REPO}@${BRANCH}.`, '#0a7a2a');
     setTimeout(() => $banner.remove(), 6000);
@@ -320,33 +319,56 @@
 
   function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-  async function commit(token, path, dataObj) {
-    const apiBase = `https://api.github.com/repos/${REPO}/contents/${path}`;
-    // get existing SHA so we can update rather than create-conflict
-    let sha = null;
-    const head = await fetch(`${apiBase}?ref=${BRANCH}`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' },
-    });
-    if (head.ok) sha = (await head.json()).sha;
-    else if (head.status !== 404) throw new Error(`GitHub GET ${path}: HTTP ${head.status}`);
+  /**
+   * Commit by opening a popup on github.io and posting the data to it. We
+   * can't fetch api.github.com from this context because LinkedIn's CSP
+   * `connect-src` directive blocks external API endpoints, even from a
+   * bookmarklet. The github.io popup has no such CSP, so it can call
+   * api.github.com freely.
+   */
+  function commitViaPopup(token, profile, experience) {
+    return new Promise((resolve, reject) => {
+      const popup = window.open(
+        'https://at0m-b0mb.github.io/linkedin-sync/commit.html',
+        'linkedin-sync-commit',
+        'width=520,height=300'
+      );
+      if (!popup) {
+        reject(new Error(
+          'Popup was blocked. Allow popups for linkedin.com (click the popup-blocked icon in the address bar) and try again.'
+        ));
+        return;
+      }
 
-    const body = {
-      message: `chore: sync ${path} from LinkedIn`,
-      content: btoa(unescape(encodeURIComponent(JSON.stringify(dataObj, null, 2) + '\n'))),
-      branch: BRANCH,
-      committer: { name: 'at0m-b0mb', email: '99875896+at0m-b0mb@users.noreply.github.com' },
-      author:    { name: 'at0m-b0mb', email: '99875896+at0m-b0mb@users.noreply.github.com' },
-    };
-    if (sha) body.sha = sha;
+      let settled = false;
+      function cleanup() {
+        settled = true;
+        window.removeEventListener('message', onMessage);
+      }
+      function onMessage(ev) {
+        if (ev.source !== popup) return;
+        const msg = ev.data;
+        if (!msg) return;
+        if (msg.type === 'commit-ready') {
+          popup.postMessage(
+            { type: 'commit', token, profile, experience },
+            'https://at0m-b0mb.github.io'
+          );
+        } else if (msg.type === 'done') {
+          cleanup();
+          resolve();
+        } else if (msg.type === 'error') {
+          cleanup();
+          reject(new Error(msg.error || 'commit popup reported an error'));
+        }
+      }
+      window.addEventListener('message', onMessage);
 
-    const r = await fetch(apiBase, {
-      method: 'PUT',
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      setTimeout(() => {
+        if (settled) return;
+        cleanup();
+        reject(new Error('Commit popup did not respond within 30s.'));
+      }, 30000);
     });
-    if (!r.ok) {
-      const txt = await r.text();
-      throw new Error(`GitHub PUT ${path}: HTTP ${r.status} — ${txt.slice(0, 200)}`);
-    }
   }
 })();

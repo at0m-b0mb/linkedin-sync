@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>linkedin-sync · committing</title>
+<style>
+  body { font: 14px/1.4 -apple-system, system-ui, sans-serif; padding: 20px; max-width: 500px; }
+  .status { padding: 14px; border-radius: 6px; background: #f4f4f4; min-height: 60px; white-space: pre-wrap; }
+  .ok { background: #d4f1d4; }
+  .err { background: #ffd4d4; }
+</style>
+</head>
+<body>
+<h2>linkedin-sync</h2>
+<div id="s" class="status">Waiting for data from the LinkedIn tab…</div>
+<script>
+const s = document.getElementById('s');
+const REPO = 'at0m-b0mb/linkedin-sync';
+const BRANCH = 'main';
+const ALLOWED = ['https://www.linkedin.com', 'https://linkedin.com'];
+
+function show(text, cls) {
+  s.textContent = text;
+  s.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+window.addEventListener('message', async (ev) => {
+  if (!ALLOWED.includes(ev.origin)) return;
+  const msg = ev.data;
+  if (!msg || msg.type !== 'commit') return;
+  try {
+    show('Committing profile.json …');
+    await commit(msg.token, 'profile.json', msg.profile);
+    show('Committing experience.json …');
+    await commit(msg.token, 'experience.json', msg.experience);
+    show(`Done. Synced ${msg.experience.length} positions + profile.\nThis window will close in 3s.`, 'ok');
+    ev.source.postMessage({ type: 'done', count: msg.experience.length }, ev.origin);
+    setTimeout(() => window.close(), 3000);
+  } catch (err) {
+    show('Error: ' + err.message, 'err');
+    ev.source.postMessage({ type: 'error', error: err.message }, ev.origin);
+  }
+});
+
+// Tell the opener we're ready to receive data.
+if (window.opener && !window.opener.closed) {
+  window.opener.postMessage({ type: 'commit-ready' }, '*');
+} else {
+  show('No opener window — open this page via the LinkedIn bookmarklet, not directly.', 'err');
+}
+
+async function commit(token, path, data) {
+  const apiBase = `https://api.github.com/repos/${REPO}/contents/${path}`;
+  let sha = null;
+  const head = await fetch(`${apiBase}?ref=${BRANCH}`, {
+    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' },
+  });
+  if (head.ok) sha = (await head.json()).sha;
+  else if (head.status !== 404) throw new Error(`GET ${path}: HTTP ${head.status}`);
+
+  const body = {
+    message: `chore: sync ${path} from LinkedIn`,
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2) + '\n'))),
+    branch: BRANCH,
+    committer: { name: 'at0m-b0mb', email: '99875896+at0m-b0mb@users.noreply.github.com' },
+    author:    { name: 'at0m-b0mb', email: '99875896+at0m-b0mb@users.noreply.github.com' },
+  };
+  if (sha) body.sha = sha;
+
+  const r = await fetch(apiBase, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`PUT ${path}: HTTP ${r.status} — ${txt.slice(0, 300)}`);
+  }
+}
+</script>
+</body>
+</html>
